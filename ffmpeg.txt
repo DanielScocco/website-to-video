@@ -1,0 +1,102 @@
+Overlay image on video
+
+ffmpeg -i input.mp4 -i 1.png -filter_complex "[0:v][1:v] overlay=25:25:enable='between(t,0,20)'" \
+-pix_fmt yuv420p -c:a copy output.mp4
+
+----------------------------------------------------
+
+Add audio to video (if video has audio, needs to map video from input 0 and audio from input 1)
+
+ffmpeg -i matrix-16.mp4 -i port-audio.mp3 -map 0:v -map 1:a -acodec aac -strict -2 output.mp4
+
+---------------------------
+
+Add audio to video: stream copy
+
+ffmpeg -i video.avi -i audio.mp3 -codec copy -shortest output.avi
+
+Omitting the -map option will use the default stream selection. This will work if your video input has no audio.
+This example uses -codec copy to stream copy (no re-encoding; quality is preserved and it is fast).
+The -shortest option will make output.avi the same duration as the shortest input.
+
+----------------------------------------------------
+
+Add audio to video: re-encode
+
+If your output doesn't like the original formats, or if you want to change formats you can specify the encoders:
+
+ffmpeg -i video.avi -i audio.mp3 -c:v libx264 -c:a libvorbis -shortest output.mkv
+
+----------------------------------------------------
+
+To manually choose specific streams
+
+Sometimes the default stream selection won't give you the result you want. In this example video.mp4 has video and audio, and audio.m4a only has audio. Use -map to choose video from video.mp4 and audio from audio.m4a:
+
+ffmpeg -i video.mp4 -i audio.m4a -map 0:v -map 1:a -c copy -shortest output.mp4
+-map 0:v – From input 0 (the first input, which is video.mp4) choose the video stream(s).
+-map 1:a – From input 1 (the second input, which is audio.m4a) choose the audio stream(s).
+
+----------------------------------------------------
+
+Mixing/combining two audio inputs into one  (needs tweaking, see below for a better version)
+
+Take video from video.webm, and use the amerge filter to combine the audio from video.webm and audio.oga:
+
+ffmpeg -i video.webm -i audio.oga -filter_complex \
+"[0:a][1:a]amerge=inputs=2[a]" \
+-map 0:v -map "[a]" -c:v copy -c:a libvorbis -ac 2 -shortest out.webm
+
+----------------------------------------------------
+
+Generate silent audio
+
+You can use the anullsrc filter to make a silent audio stream. The filter allows you to choose the desired channel layout (mono, stereo, 5.1, etc) and the sample rate.
+
+ffmpeg -i video.mp4 -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 \
+-c:v copy -shortest output.mp4
+
+----------
+concat mp3
+
+ffmpeg -i "concat:intro-1.mp3|audio.mp3" -acodec copy output.mp3
+
+
+----------------
+overlay many images at the same time
+
+ffmpeg -i output.mp4 -i 1.png -i 2.png -i 3.png -i 4.png -i 5.png -i 6.png -i 7.png -i 8.png -filter_complex "[0][1] overlay=0:0:enable='between(t,4,9)'[v1];[v1][2] overlay=0:0:enable='between(t,9,15)'[v2];[v2][3] overlay=0:0:enable='between(t,15,20)'[v3];[v3][4] overlay=0:0:enable='between(t,20,25)'[v4];[v4][5] overlay=0:0:enable='between(t,25,31)'[v5];[v5][6] overlay=0:0:enable='between(t,31,33)'[v6];[v6][7] overlay=0:0:enable='between(t,33,39)'[v7]; [v7][8] overlay=0:0:enable='between(t,39,47)'[v8];[v8][1] overlay=0:0:enable='gt(t,47)'[v9]" -map "[v9]" -map 0:a -pix_fmt yuv420p -c:a copy 1.mp4
+
+
+----------
+cut video length at the end
+
+ffmpeg -i input.mp4 -c copy -t 00:00:10.0 background.mp4
+
+
+-------
+cut beginning and end of video
+
+You can use the -ss option to specify a start timestamp, and the -t option to specify the encoding duration. The timestamps need to be in HH:MM:SS.xxx format or in seconds.
+
+The following would clip the first 30 seconds, and then clip everything that is 10 seconds after that:
+
+ffmpeg -i input.wmv -ss 00:00:30.0 -c copy -t 00:00:10.0 output.wmv
+ffmpeg -i input.wmv -ss 30 -c copy -t 10 output.wmv
+
+Note that -t is an output option and always needs to be specified after -i.
+
+---------------
+overlay 2 audio files, adjusting respective volumes
+
+ffmpeg -i audio.mp3 -i 2.mp3 -filter_complex "[0:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,volume=2.5[a1]; [1:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,volume=0.3[a2]; [a1][a2]amerge,pan=stereo:c0<c0+c2:c1<c1+c3[out]" -map "[out]" -c:a libmp3lame -q:a 0 -shortest output.mp3
+
+------
+concat 2 videos with list.txt
+
+ffmpeg -f concat -i list.txt -c copy background.mp4
+
+
+----------
+adjust framerate and resolution of video
+ffmpeg -i 3.mp4 -r 25 -s 1920x1080 output.mp4
